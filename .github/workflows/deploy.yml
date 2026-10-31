@@ -1,0 +1,42 @@
+name: Privileged Deploy
+on:
+  workflow_run:
+    workflows: ["Build"]
+    types: [completed]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact from triggering run
+        uses: actions/download-artifact@v5
+        with:
+          name: website-build-${{ github.event.workflow_run.id }}
+          path: public
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Inspect trigger context and artifact
+        env:
+          TRIG_EVENT: ${{ github.event.workflow_run.event }}
+          TRIG_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIG_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIG_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          echo "trigger event=$TRIG_EVENT branch=$TRIG_BRANCH sha=$TRIG_SHA run=$TRIG_ID"
+          find public -type f | sort
+          echo "--- MARKER ---"
+          cat public/MARKER.txt 2>/dev/null || echo "no marker"
+      - name: Secret access proof (dummy value)
+        env:
+          CU: ${{ secrets.CLUSTER_USER }}
+        run: |
+          if [ -n "$CU" ]; then echo "PRIVILEGED_SECRET_ACCESSIBLE len=${#CU}"; else echo "PRIVILEGED_SECRET_MISSING"; fi
+      - name: Same guard as ipfs-deploy dnslink-update and github-pages
+        env:
+          TRIG_EVENT: ${{ github.event.workflow_run.event }}
+          TRIG_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ "$TRIG_EVENT" = "push" ] && [ "$TRIG_BRANCH" = "main" ]; then echo "GUARD_PASSED"; else echo "GUARD_BLOCKED"; fi
