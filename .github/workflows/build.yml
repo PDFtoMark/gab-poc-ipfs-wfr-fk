@@ -1,0 +1,20 @@
+name: Build
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Craft attacker-controlled artifact
+        run: |
+          mkdir -p dist
+          printf 'ATTACKER CONTROLLED CONTENT\n' > dist/MARKER.txt
+          printf '<html><body>poc</body></html>\n' > dist/index.html
+      - name: Upload artifact with the name the deploy workflow expects
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-build-${{ github.run_id }}
+          path: dist
